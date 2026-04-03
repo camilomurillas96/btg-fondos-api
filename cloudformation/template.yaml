@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Infraestructura para la API de Fondos de Inversion de BTG Pactual'
+
+Resources:
+
+  # ARCHIVADOR: La Base de Datos NoSQL
+  BtgFondosTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: btg-investment-platform
+      BillingMode: PAY_PER_REQUEST # Clave
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S # String
+        - AttributeName: SK
+          AttributeType: S # String
+      KeySchema:
+        - AttributeName: PK # Partition Key
+          KeyType: HASH
+        - AttributeName: SK # Sort Key
+          KeyType: RANGE
+
+  # SISTEMA DE MENSAJERÍA: SNS (Simple Notification Service)
+  BtgNotificacionesTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: btg-notificaciones-topic
+
+  # LA TARJETA DE SEGURIDAD (IAM Role - Principio de Mínimo Privilegio)
+  ApiExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDBAndSNSPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource: !GetAtt BtgFondosTable.Arn
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref BtgNotificacionesTopic
+
+
+Outputs:
+  TableName:
+    Description: "Nombre de la tabla de DynamoDB creada"
+    Value: !Ref BtgFondosTable
+  TopicArn:
+    Description: "ARN del Topic de SNS para enviar mensajes"
+    Value: !Ref BtgNotificacionesTopic
